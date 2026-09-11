@@ -24,12 +24,13 @@ from .synth.alu import ALU
 from .cpu.regfile import RegisterFile
 from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
+from .palette import PALET, ansi256
 
 BASE = 0x1000
-W, H = 32, 32
-# uzaklığa göre piksel paleti (screen byte'ları bunlardır)
-GRAY = {"@": "\x1b[37;47m@", "#": "\x1b[37;40m#", "%": "\x1b[33;40m%",
-        "+": "\x1b[33;40m+", ".": "\x1b[30;40m.", " ": "\x1b[30;40m "}
+W, H = 64, 40
+# Piksel karakterini 256-renk ANSI ön plan rengine çevir (paylaşılan palet).
+GRAY = {c: "\x1b[38;5;%dm%s" % (ansi256(rgb), c) for c, rgb in PALET.items()}
+GRAY.setdefault(' ', "\x1b[38;5;%dm " % ansi256(PALET[' ']))
 
 
 def build_environment() -> tuple[NeuroCPU, Memory, dict, dict, GateRegistry]:

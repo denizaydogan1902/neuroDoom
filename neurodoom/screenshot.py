@@ -2,7 +2,7 @@
 
 Her sahne: beyin kapılarından kurulan NÖRO-8 üzerinde doom.c'nin ilk
 kareleri koşar, framebuffer'ın sahibi olan RAM bölgesi ham olarak okunur
-ve 16x16 piksellik görüntü komşu-katlanarak (nearest) PNG'ye yazılır.
+ve 64x40 piksellik görüntü komşu-katlanarak (nearest) PNG'ye yazılır.
 
 Kullanım:  python -m neurodoom.screenshot
 """
@@ -22,19 +22,12 @@ from .synth.alu import ALU
 from .cpu.regfile import RegisterFile
 from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
+from .palette import PALET
 
 BASE = 0x1000
-FACTOR = 18              # her pikselin kenar uzunluğu (32x18=576)
-W = H = 32
-# gölgelendirme paleti → ışıklı sıcak tonlar (Wolfenstein 3D havası)
-PALET = {
-    ' ': (12, 12, 14),
-    '.': (58, 60, 66),
-    '+': (116, 108, 96),
-    '%': (178, 162, 122),
-    '#': (238, 222, 182),
-    '@': (255, 244, 214),
-}
+FACTOR = 9               # her pikselin kenar uzunluğu (64x9=576, 40x9=360)
+W = 64
+H = 40
 
 
 def _png(path: Path, rgb: np.ndarray) -> None:
@@ -77,19 +70,19 @@ def capture() -> dict[str, np.ndarray]:
                     mem.ram[varmap['py']] = preset[1] & 0xFF
                     mem.ram[varmap['pa']] = preset[2] & 0xFF
         scr = varmap['screen0']
-        cells = [[chr(int(mem.ram[scr + y * 32 + x])) for x in range(32)]
-                 for y in range(32)]
-        img = np.zeros((32 * FACTOR, 32 * FACTOR, 3), dtype=np.uint8)
-        for y in range(32):
-            for x in range(32):
+        cells = [[chr(int(mem.ram[scr + y * 64 + x])) for x in range(64)]
+                 for y in range(40)]
+        img = np.zeros((H * FACTOR, W * FACTOR, 3), dtype=np.uint8)
+        for y in range(H):
+            for x in range(W):
                 img[y * FACTOR:(y + 1) * FACTOR, x * FACTOR:(x + 1) * FACTOR] \
                     = PALET.get(cells[y][x], PALET[' '])
         return img, cpu.state.gate_firings
 
     out: dict[str, np.ndarray] = {}
     out["start"] = frame(None)[0]                    # E1M1 spawn (8,8) 16=Doğu
-    out["advanced"] = frame((136 + 16, 136, 16))[0]  # koridorda doğuya yürümüş
-    out["turned"] = frame((136, 136, 32))[0]         # sola dönmüş (Kuzey)
+    out["advanced"] = frame((136 + 16, 136, 24))[0]  # güneydoğuya ilerlemiş
+    out["turned"] = frame((136, 136, 32))[0]         # sola dönmüş (Kuzey) duvar
     out["retreat"] = frame((136 - 16, 136, 16))[0]   # girişe doğru geri
     return out
 

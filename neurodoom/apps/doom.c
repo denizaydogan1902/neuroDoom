@@ -5,22 +5,29 @@
  * derlenir, beyin NAND kapılarından kurulan NeuroCPU-8 üzerinde koşar.
  *
  * Harita: ORİJİNAL Doom shareware (DOOM1.WAD) E1M1 "Hangar" girişi.
- *   Doom birimleri dünyasından (x: 96, y: -272) 16x16 ızgaraya rasterlenir.
- *   Hücre boyutu 16 birim — her orijinal hücre 2x2 olarak genişletildi.
- * Görüş: 32x32 piksel ASCII framebuffer.
+ *   Doom birimleri dünyasından 16x16 ızgaraya rasterlenir; hücre 16 birim.
+ * Görüş: 64x40 piksel (1.6:1 — orijinal Doom'un 320x200 en-boy oranı).
+ * Renk: 8 duvar dokusu x 6 uzaklık gölgesi = 48 ton + zemin - tavan fade.
  * Girdi: port 0 (klavye), Çıktı: port 2 (frame sync).
  */
 
-#define W 32
-#define H 32
+#define W 64
+#define H 40
 
-/* 32x32 framebuffer, 4 x 256'lık dilim — NÖRO-8'in 8-bit indeksi
- * tek diziyi 256'da keser; dilimler bellek içinde ARDIŞIK durur,
- * böylece dış okuyucu (screenshot/GIF) tek parça görür. */
+/* 64x40 framebuffer = 2560 bayt -> 10 x 256'lık dilim. NÖRO-8'in 8-bit
+ * indeksi tek diziyi 256'da keser; dilimler bellek içinde ARDIŞIK durur,
+ * böylece dış okuyucu (screenshot/GIF) tek parça görür.
+ * Dilim: satır = y >> 2 (0..9), piksel = (y & 3) * 64 + x. */
 char screen0[256];
 char screen1[256];
 char screen2[256];
 char screen3[256];
+char screen4[256];
+char screen5[256];
+char screen6[256];
+char screen7[256];
+char screen8[256];
+char screen9[256];
 
 char map[256] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -62,9 +69,11 @@ void frame()
         int top;
         int bottom;
         int hit;
-        int row;
+        int sl;
         int pix;
-        ang = (pa + x - 16 + 64) & 63;
+        int tex;
+        int sh;
+        ang = (pa + (x >> 1) - 16 + 64) & 63;
         dx = sintab[ang];
         dy = costab[ang];
         rx = px + 8;
@@ -83,31 +92,51 @@ void frame()
                 if (h > H) { h = H; }
                 if (h < 1) { h = 1; }
                 hit = 1;
+                tex = ((ry >> 4) + (rx >> 4)) & 7;
+                if (d < 4) { sh = 5; }
+                if (d >= 4 && d < 7) { sh = 4; }
+                if (d >= 7 && d < 10) { sh = 3; }
+                if (d >= 10 && d < 13) { sh = 2; }
+                if (d >= 13 && d < 16) { sh = 1; }
+                if (d >= 16) { sh = 0; }
             }
         }
-        top = (32 - h) / 2;
+        top = (40 - h) / 2;
         bottom = top + h;
         for (y = 0; y < H; y = y + 1)
         {
             char sprite;
             sprite = ' ';
-            if (y < top) { sprite = '.'; }
+            if (y < top) { sprite = ' '; }
             if (top <= y && y < bottom)
             {
-                if (d < 4) { sprite = '@'; }
-                if (d >= 4 && d < 7) { sprite = '#'; }
-                if (d >= 7 && d < 10) { sprite = '%'; }
-                if (d >= 10 && d < 13) { sprite = '+'; }
-                if (d >= 13) { sprite = '.'; }
+                if (hit == 1)
+                {
+                    /* 'A' + 8 doku * 6 gölge -> 48 duvar tonu */
+                    sprite = 'A' + tex * 6 + sh;
+                }
+                else
+                {
+                    sprite = '-';
+                }
             }
-            if (y >= bottom && hit == 0) { sprite = '.'; }   /* zemin */
-            if (y >= bottom + 11) { sprite = '%'; }          /* zemine yakın */
-            row = y >> 3;              /* 0..3: hangi dilim */
-            pix = (y - row * 8) * W + x;   /* dilim içi 0..255 */
-            if (row == 0) { screen0[pix] = sprite; }
-            if (row == 1) { screen1[pix] = sprite; }
-            if (row == 2) { screen2[pix] = sprite; }
-            if (row == 3) { screen3[pix] = sprite; }
+            if (y >= bottom)
+            {
+                if (d < 10) { sprite = '.'; }
+                else { sprite = '~'; }
+            }
+            sl = y >> 2;               /* 0..9: hangi dilim (4 satır x 64) */
+            pix = (y & 3) * W + x;     /* dilim içi 0..255 */
+            if (sl == 0) { screen0[pix] = sprite; }
+            if (sl == 1) { screen1[pix] = sprite; }
+            if (sl == 2) { screen2[pix] = sprite; }
+            if (sl == 3) { screen3[pix] = sprite; }
+            if (sl == 4) { screen4[pix] = sprite; }
+            if (sl == 5) { screen5[pix] = sprite; }
+            if (sl == 6) { screen6[pix] = sprite; }
+            if (sl == 7) { screen7[pix] = sprite; }
+            if (sl == 8) { screen8[pix] = sprite; }
+            if (sl == 9) { screen9[pix] = sprite; }
         }
     }
 }
