@@ -4,7 +4,9 @@
  * Bu dosya C altsetinde yazılır, gömülü derleyici (neurodoom/cc) tarafından
  * derlenir, beyin NAND kapılarından kurulan NeuroCPU-8 üzerinde koşar.
  *
- * Harita: 8x8 ızgara, her hücre 32 birim (world 0..255, torus).
+ * Harita: ORİJİNAL Doom shareware (DOOM1.WAD) E1M1 "Hangar" girişi.
+ *   Doom birimleri dünyasından (x: 96, y: -272) 8x8 ızgaraya rasterlenir,
+ *   nöromap alt-üst (screen: satır0 tepede) için y-simetrik çevrilir.
  * Görüş: 16x16 piksel ASCII framebuffer.
  * Girdi: port 0 (klavye), Çıktı: port 2 (frame sync).
  */
@@ -14,14 +16,14 @@
 
 char screen[256];   /* W * H */
 
-char map[64] = {1,1,1,1,1,1,1,1,
-                1,0,1,0,0,0,0,1,
-                1,0,1,0,1,1,1,1,
-                1,0,0,0,0,0,0,1,
-                1,0,1,0,1,0,1,1,
-                1,0,1,0,1,0,0,1,
-                1,0,0,0,1,0,1,1,
-                1,1,1,1,1,1,1,1};
+char map[64] = {0,0,0,0,0,0,0,0,
+                0,1,1,1,1,1,1,1,
+                0,1,0,0,0,0,0,0,
+                1,1,0,0,0,0,0,0,
+                1,1,0,0,0,0,0,0,
+                1,1,0,0,0,0,0,0,
+                0,1,1,1,1,1,1,1,
+                0,0,0,0,0,0,0,0};
 
 char sintab[64] = {0,1,2,2,3,4,4,5,6,6,7,7,7,8,8,8,8,8,8,8,7,7,7,6,6,5,4,4,3,2,2,1,0,255,254,254,253,252,252,251,250,250,249,249,249,248,248,248,248,248,248,248,249,249,249,250,250,251,252,252,253,254,254,255};
 char costab[64] = {8,8,8,8,7,7,7,6,6,5,4,4,3,2,2,1,0,255,254,254,253,252,252,251,250,250,249,249,249,248,248,248,248,248,248,248,249,249,249,250,250,251,252,252,253,254,254,255,0,1,2,2,3,4,4,5,6,6,7,7,7,8,8,8};
@@ -87,9 +89,9 @@ void frame()
 
 void main()
 {
-    px = 3 * 32 + 16;
-    py = 3 * 32 + 16;
-    pa = 0;
+    px = 4 * 32 + 16;
+    py = 4 * 32 + 16;
+    pa = 16;
     while (1)
     {
         int k;
@@ -100,14 +102,14 @@ void main()
         if (k == 'd' || k == 'D') { pa = (pa - 2) & 63; }
         if (k == 'w' || k == 'W')
         {
-            nx = px + costab[pa];
-            ny = py + sintab[pa];
+            nx = px + sintab[pa];
+            ny = py + costab[pa];
             if (map[((ny >> 5) * 8) + (nx >> 5)] == 0) { px = nx; py = ny; }
         }
         if (k == 's' || k == 'S')
         {
-            nx = px - costab[pa];
-            ny = py - sintab[pa];
+            nx = px - sintab[pa];
+            ny = py - costab[pa];
             if (map[((ny >> 5) * 8) + (nx >> 5)] == 0) { px = nx; py = ny; }
         }
         frame();
