@@ -1,0 +1,6 @@
+# core
+numpy>=1.26
+scipy>=1.11
+
+# tests
+pytest>=8.0
