@@ -1,7 +1,7 @@
 """Gerçek hemibrain CPU'sunda çekilen karelerden yürüyüş GIF'i üretir.
 
 Kareler: doom.c, NAND kapılarından kurulu NÖRO-8 üzerinde koşar, her sahnede
-framebuffer RAM'den okunur ve Pillow ile GIF'e birleştirilir.
+320x200 video framebuffer RAM'den okunur ve Pillow ile GIF'e birleştirilir.
 
 Kullanım:  python -m neurodoom.make_gif
 """
@@ -20,12 +20,10 @@ from .synth.alu import ALU
 from .cpu.regfile import RegisterFile
 from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
-from .palette import PALET
+from .palette import video_to_img
 
 BASE = 0x1000
-SCALE = 9                  # her pikselin kenar uzunluğu (64x9=576, 40x9=360)
-W = 64
-H = 40
+SCALE = 2                  # her pikselin kenar uzunluğu (320x2=640, 200x2=400)
 
 
 def main() -> None:
@@ -38,7 +36,7 @@ def main() -> None:
     gates = scan_nand_cells(brain)
     alu = ALU(gates)
 
-    def render(preset: tuple[int, int, int]) -> list[list[str]]:
+    def render(preset: tuple[int, int, int]) -> np.ndarray:
         mem = Memory()
         mem.load_program(prog, BASE)
         cpu = NeuroCPU(alu, RegisterFile(brain), mem)
@@ -53,38 +51,30 @@ def main() -> None:
                     mem.ram[vm['px']] = preset[0] & 0xFF
                     mem.ram[vm['py']] = preset[1] & 0xFF
                     mem.ram[vm['pa']] = preset[2] & 0xFF
-        s = vm['screen0']
-        return [[chr(int(mem.ram[s + y * 64 + x])) for x in range(64)]
-                for y in range(40)]
+        return video_to_img(mem)
 
-    sx = 8 * 16 + 8
+    sx = 8 * 16 + 8                       # 136 — oyuncu hücresi merkezi
     sy = 8 * 16 + 8
-    poses = [(sx + dx * 4, sy, 16) for dx in range(0, 8)]               # doğuya yürü
-    poses += [(sx + 7 * 4, sy, 24),
-              (sx + 7 * 4, sy, 32),
-              (sx + 7 * 4, sy, 40)]                                     # sola dön
-    poses += [(sx + 5 * 4, sy, 40),
-              (sx + 3 * 4, sy, 40),
-              (sx + 1 * 4, sy, 32)]                                     # kuzey duvara yaklaş
+    poses = [(sx + dx * 4, sy, 32) for dx in range(0, 8)]               # doğuya yürü
+    poses += [(sx + 7 * 4, sy, 48),
+              (sx + 7 * 4, sy, 64),
+              (sx + 7 * 4, sy, 80)]                                     # kuzeye dön
+    poses += [(sx + 5 * 4, sy, 64),
+              (sx + 3 * 4, sy, 64),
+              (sx + 1 * 4, sy, 48)]                                     # duvara yaklaş
 
     frames: list[Image.Image] = []
-    size = W * SCALE, H * SCALE
+    size = 320 * SCALE, 200 * SCALE
     for p in poses:
-        chars = render(p)
-        img = Image.new('RGB', size)
-        px = img.load()
-        for y in range(H):
-            for x in range(W):
-                c = PALET.get(chars[y][x], PALET[' '])
-                for yy in range(SCALE):
-                    for xx in range(SCALE):
-                        px[x * SCALE + xx, y * SCALE + yy] = c
+        img = Image.fromarray(render(p))
+        if SCALE > 1:
+            img = img.resize(size, Image.NEAREST)
         frames.append(img)
         print(f'kare: px={p[0]} py={p[1]} pa={p[2]}')
 
     dst = Path(__file__).parent.parent / "docs" / "screenshots" / "e1m1_run.gif"
     frames[0].save(dst, save_all=True, append_images=frames[1:],
-                   duration=350, loop=0)
+                   duration=400, loop=0)
     print(f'OK: {dst}  {len(frames)} kare, {size[0]}x{size[1]}px')
 
 

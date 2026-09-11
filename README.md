@@ -21,10 +21,10 @@ Software is not simulated on the brain; the machine code is executed by
 
 | | Original Doom (1993) | NeuroDoom |
 |---|---|---|
-| **Display** | 320×200 px, 256 colors | 64×40 px, 48 wall shades (8 textures × 6 depths) + floor |
+| **Display** | 320×200 px, 256 colors | 320×200 px, 64 wall shades (8 textures × 8 depths) + floor |
 | **CPU** | Intel 486 (millions of transistors) | 812 NAND gates (from fly brain) |
 | **Gate count** | ~1.2M transistors | 812 |
-| **Speed** | 35 fps | ~0.5 fps |
+| **Speed** | 35 fps | ~0.17 fps (Python gate sim) |
 | **Engine** | id Tech 1 (hand-written Assembly) | DDA raycasting (C → our compiler) |
 
 Original Doom:
@@ -91,9 +91,9 @@ E1M1 "Hangar" map data from the original shareware DOOM1.WAD:
 
 These are not mockups: each PNG comes from `python -m neurodoom.screenshot`,
 which runs the binary on the 812-gate NeuroCPU-8 and reads the resulting
-64×40 framebuffer from RAM. The 64×40 shape matches the original Doom's
-320×200 aspect ratio (1.6:1), and each wall carries one of 8 texture hues
-shaded by distance into 48 distinct tones.
+320×200 video framebuffer from the video port. Same resolution as the original
+Doom (1.6:1 aspect), and each wall carries one of 8 texture hues shaded by
+distance into 64 distinct tones.
 
 ## Real Doom data, real gates
 
@@ -153,22 +153,22 @@ Our own C compiler (`neurodoom/cc/`) supports a minimal C subset:
 The Doom engine (`neurodoom/apps/doom.c`) is written entirely in this
 language:
 
-- 64×40 pixel raycasting (DDA algorithm), aspect-matched to Doom
+- 320×200 pixel raycasting (DDA algorithm) — the original Doom resolution
 - 16×16 cell map (from E1M1, 256 bytes)
-- 8 procedural wall textures × 6 distance shades = 48 colors
+- 8 procedural wall textures × 8 distance shades = 64 colors
 - Input: port 0 (keyboard)
-- Output: port 2 writes (frame sync)
+- Output: port 0x92 (video, column-major auto-increment), port 2 (frame sync)
 
 ### 4. Pipeline
 
 ```
-doom.c ──[compiler]──→ NÖRO-8 machine code (3.8 KB)
+doom.c ──[compiler]──→ NÖRO-8 machine code (3.9 KB)
                             │
                             ▼
                   812-gate circuit (brains)
                             │
                             ▼
-                  64×40 pixel display, 48 wall tones
+                  320×200 pixel display, 64 wall tones
 ```
 
 ## Running
@@ -252,7 +252,7 @@ neurodoom/
 │   └── doom2neuro.py        # DOOM1.WAD E1M1 → neural map
 ├── assembler.py             # Two-pass assembler
 ├── datasheet.py             # ISA definition (opcodes)
-├── palette.py               # 48 wall tones + floor (RGB + ANSI 256)
+├── palette.py               # 64 wall tones + floor (RGB + ANSI 256)
 ├── frontpanel.py            # Terminal game front panel
 └── screenshot.py            # PNG screenshot producer
 ```
@@ -262,10 +262,12 @@ neurodoom/
 - **Memory:** 64 KB byte-addressable RAM, ported I/O
 - **Address spaces:** program starts at 0x1000, globals at 0x0200
 - **Assembly:** two-pass, labels resolved to absolute addresses
-- **Shading:** wall distance → 8 texture hues ('A'..'p'), each 6 depth levels;
+- **Video:** port-mapped 320×200 framebuffer (VID_L/VID_H/VID_D at 0x90/0x91/0x92);
+  one `OUT` per pixel with auto-incrementing column-major cursor
+- **Shading:** wall distance → 8 texture hues, each 8 depth levels;
   floor fades to dark, ceiling stays dark
 - **Map:** 16×16 cells, each cell 16 world-units wide
-- **Per frame:** ~483,000 machine instructions, ~5.4M gate activations
+- **Per frame:** ~2.8M machine instructions, ~34M gate activations
 
 ## Numbers
 
@@ -274,10 +276,10 @@ neurodoom/
 | Neurons | 21,739 |
 | Synapses | 3,550,403 |
 | NAND gates | 812 |
-| Machine code | 3,768 bytes |
+| Machine code | 3,930 bytes |
 | Tests | 21/21 |
-| Frame rate | ~0.5 fps |
-| Gate activations/frame | ~5.4M |
+| Frame rate | ~0.17 fps (Python gate simulation) |
+| Gate activations/frame | ~34M |
 
 ## Credits
 

@@ -1,8 +1,8 @@
 """Gerçek hemibrain CPU'sundan PNG ekran görüntüleri üretir.
 
 Her sahne: beyin kapılarından kurulan NÖRO-8 üzerinde doom.c'nin ilk
-kareleri koşar, framebuffer'ın sahibi olan RAM bölgesi ham olarak okunur
-ve 64x40 piksellik görüntü komşu-katlanarak (nearest) PNG'ye yazılır.
+kareleri koşar, 320x200 kolon-major video framebuffer RAM'den okunur
+ve komşu-katlanarak (nearest) PNG'ye yazılır.
 
 Kullanım:  python -m neurodoom.screenshot
 """
@@ -22,12 +22,10 @@ from .synth.alu import ALU
 from .cpu.regfile import RegisterFile
 from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
-from .palette import PALET
+from .palette import video_to_img
 
 BASE = 0x1000
-FACTOR = 9               # her pikselin kenar uzunluğu (64x9=576, 40x9=360)
-W = 64
-H = 40
+FACTOR = 2               # her pikselin kenar uzunluğu (320x2=640, 200x2=400)
 
 
 def _png(path: Path, rgb: np.ndarray) -> None:
@@ -69,21 +67,17 @@ def capture() -> dict[str, np.ndarray]:
                     mem.ram[varmap['px']] = preset[0] & 0xFF
                     mem.ram[varmap['py']] = preset[1] & 0xFF
                     mem.ram[varmap['pa']] = preset[2] & 0xFF
-        scr = varmap['screen0']
-        cells = [[chr(int(mem.ram[scr + y * 64 + x])) for x in range(64)]
-                 for y in range(40)]
-        img = np.zeros((H * FACTOR, W * FACTOR, 3), dtype=np.uint8)
-        for y in range(H):
-            for x in range(W):
-                img[y * FACTOR:(y + 1) * FACTOR, x * FACTOR:(x + 1) * FACTOR] \
-                    = PALET.get(cells[y][x], PALET[' '])
+        img = video_to_img(mem)
+        if FACTOR > 1:
+            h, w, _ = img.shape
+            img = np.repeat(np.repeat(img, FACTOR, axis=0), FACTOR, axis=1)
         return img, cpu.state.gate_firings
 
     out: dict[str, np.ndarray] = {}
-    out["start"] = frame(None)[0]                    # E1M1 spawn (8,8) 16=Doğu
-    out["advanced"] = frame((136 + 16, 136, 24))[0]  # güneydoğuya ilerlemiş
-    out["turned"] = frame((136, 136, 32))[0]         # sola dönmüş (Kuzey) duvar
-    out["retreat"] = frame((136 - 16, 136, 16))[0]   # girişe doğru geri
+    out["start"] = frame(None)[0]                    # E1M1 spawn (8,8) 32=Doğu
+    out["advanced"] = frame((136 + 16, 136, 32))[0]  # doğuya ilerlemiş
+    out["turned"] = frame((136, 136, 64))[0]         # kuzey duvara dönmüş
+    out["retreat"] = frame((136 - 16, 136, 32))[0]   # doğuya geri
     return out
 
 

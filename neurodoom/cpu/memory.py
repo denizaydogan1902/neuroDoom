@@ -13,12 +13,21 @@ MASK16 = 0xFFFF
 RAM_SIZE = 64 * 1024     # 64KB
 STACK_TOP = 0xFFFE       # yığın: alttan yukarı
 
+# Video portları (CPU piksel akışını buradan dış dünyaya basar).
+# 320x200 framebuffer RAM'e sığmaz; host tarafındaki video buffer'ına
+# port-based yazılır.  Column-major: piksel(x,y) = video[x*200 + y].
+VID_L, VID_H, VID_D = 0x90, 0x91, 0x92
+SCREEN_W, SCREEN_H = 320, 200
+
 
 @dataclass
 class Memory:
-    """64KB byte-addressable RAM + 16 I/O port."""
+    """64KB byte-addressable RAM + 16 I/O port + 320x200 framebuffer."""
     ram: np.ndarray = field(default_factory=lambda: np.zeros(RAM_SIZE, dtype=np.uint8))
     ports: dict[int, int] = field(default_factory=dict)
+    video: np.ndarray = field(
+        default_factory=lambda: np.zeros(SCREEN_W * SCREEN_H, dtype=np.uint8))
+    vid_cursor: int = 0
 
     def rb(self, addr: int) -> int:
         return int(self.ram[addr & MASK16])

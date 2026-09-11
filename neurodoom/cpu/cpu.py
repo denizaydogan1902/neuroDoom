@@ -13,7 +13,7 @@ import numpy as np
 from .. import datasheet as ds
 from ..synth.alu import ALU
 from ..synth.gate_registry import GateRegistry
-from .memory import Memory, STACK_TOP, MASK16
+from .memory import Memory, STACK_TOP, MASK16, VID_L, VID_H, VID_D, SCREEN_W, SCREEN_H
 from .regfile import RegisterFile
 
 MASK8 = 0xFF
@@ -82,6 +82,14 @@ class NeuroCPU:
                 self.state.mar = (self.state.mar & 0x00FF) | (val << 8)
             elif port == 0xFB:     # MEM_WRITE: yaz mar'a
                 self.mem.wb(self.state.mar, val)
+            elif port == VID_L:    # video cursor low
+                self.mem.vid_cursor = (self.mem.vid_cursor & 0xFF00) | val
+            elif port == VID_H:    # video cursor high
+                self.mem.vid_cursor = (self.mem.vid_cursor & 0x00FF) | (val << 8)
+            elif port == VID_D:    # video data (column-major, cursor++)
+                idx = self.mem.vid_cursor
+                self.mem.video[idx % (SCREEN_W * SCREEN_H)] = val
+                self.mem.vid_cursor += 1
             else:
                 self.mem.port_write(port, val)
         elif op == ds.PSH:

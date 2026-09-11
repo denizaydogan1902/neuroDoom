@@ -2,7 +2,8 @@
 
 Gerçek hemibrain NAND kapılarından NetList-ALU ile çalışan NeuroCPU-8,
 gömülü C derleyicimizin derlediği doom.c dosyasını çalıştırır.
-Terminalde ASCII framebuffer çizer; klavye port 0'a tuş bırakır.
+320x200 video framebuffer'ı terminalde indirgenmiş boyutta (80x50)
+ANSI 256-renk bloklar olarak çizer.
 
 Çalıştır:  python -m neurodoom.frontpanel
 """
@@ -24,16 +25,16 @@ from .synth.alu import ALU
 from .cpu.regfile import RegisterFile
 from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
-from .palette import PALET, ansi256
+from .palette import PALET, ansi256, SCREEN_W, SCREEN_H
 
 BASE = 0x1000
-W, H = 64, 40
-# Piksel karakterini 256-renk ANSI ön plan rengine çevir (paylaşılan palet).
-GRAY = {c: "\x1b[38;5;%dm%s" % (ansi256(rgb), c) for c, rgb in PALET.items()}
-GRAY.setdefault(' ', "\x1b[38;5;%dm " % ansi256(PALET[' ']))
+# Terminal için 320x200 -> 80x50 (her 4 piksel 1, her 4 satır 1 blok)
+DW, DH = 80, 50
+STEP_X = SCREEN_W // DW
+STEP_Y = SCREEN_H // DH
 
 
-def build_environment() -> tuple[NeuroCPU, Memory, dict, dict, GateRegistry]:
+def build_environment() -> tuple[NeuroCPU, Memory, dict, dict]:
     src = (Path(__file__).parent / "apps" / "doom.c").read_text()
     asm, varmap = compile_with_map(src)
     prog, labels = assemble(asm, base=BASE)
@@ -45,23 +46,24 @@ def build_environment() -> tuple[NeuroCPU, Memory, dict, dict, GateRegistry]:
     mem.load_program(prog, BASE)
     cpu = NeuroCPU(ALU(gates), RegisterFile(brain), mem)
     cpu.state.pc = BASE
-    return cpu, mem, varmap, labels, gates
+    return cpu, mem, varmap, labels
 
 
 def draw_frame(mem: Memory, varmap: dict, port_log: list[int]) -> None:
-    scr = varmap["screen0"]
     out = ["\x1b[H"]
-    for y in range(H):
+    for sy in range(DH):
         row = ""
-        for x in range(W):
-            ch = chr(int(mem.ram[scr + y * W + x]))
-            row += GRAY.get(ch, GRAY["."])
+        for sx in range(DW):
+            # Kolum-major: video[x*200 + y]
+            v = int(mem.video[(sx * STEP_X) * SCREEN_H + (sy * STEP_Y)])
+            rgb = PALET.get(v, (10, 10, 12))
+            row += "\x1b[48;5;%dm " % ansi256(rgb)
         out.append(row + "\x1b[0m")
     px = int(mem.ram[varmap["px"]]) / 16.0
     py = int(mem.ram[varmap["py"]]) / 16.0
     pa = int(mem.ram[varmap["pa"]])
     firings = port_log[-1] if port_log else 0
-    out.append(f"\x1b[0;90m pos=({px:.1f},{py:.1f}) yaw={pa}° "
+    out.append(f"\x1b[0;90m pos=({px:.1f},{py:.1f}) pa={pa} "
                f"frames={len(port_log)} firings={firings}\x1b[0m")
     sys.stdout.write("\n".join(out))
     sys.stdout.flush()
@@ -86,7 +88,7 @@ def read_keys(fd: int, timeout: float = 0.0) -> list[str]:
 
 
 def run() -> None:
-    cpu, mem, varmap, labels, gates = build_environment()
+    cpu, mem, varmap, labels = build_environment()
     port_log: list[int] = []                     # her skyma fire sayısı
 
     fd = sys.stdin.fileno()
@@ -97,7 +99,7 @@ def run() -> None:
         steps = 0
         while True:
             try:
-                keys = read_keys(fd, 0.02)
+                keys = read_keys(fd, 0.04)
             except KeyboardInterrupt:
                 break
             if keys:

@@ -6,28 +6,16 @@
  *
  * Harita: ORİJİNAL Doom shareware (DOOM1.WAD) E1M1 "Hangar" girişi.
  *   Doom birimleri dünyasından 16x16 ızgaraya rasterlenir; hücre 16 birim.
- * Görüş: 64x40 piksel (1.6:1 — orijinal Doom'un 320x200 en-boy oranı).
- * Renk: 8 duvar dokusu x 6 uzaklık gölgesi = 48 ton + zemin - tavan fade.
- * Girdi: port 0 (klavye), Çıktı: port 2 (frame sync).
+ *
+ * Görüntü: 320x200 piksel (orijinal Doom ile aynı), port 0x92 üzerinden
+ *   kolon-major akış olarak basılır: host Memory.video[x*200 + y].
+ *   64 ışın x 5 özdeş sütun = 320 sütun; 8-bit sayaç turlamasına gerek yok.
+ * Renk: 8 doku x 8 gölge = 64 duvar tonu (byte 48..111) + zemin + tavan.
+ * Girdi: port 0 (klavye), Çıktı: port 0x92 (video), port 2 (frame sync).
  */
 
-#define W 64
-#define H 40
-
-/* 64x40 framebuffer = 2560 bayt -> 10 x 256'lık dilim. NÖRO-8'in 8-bit
- * indeksi tek diziyi 256'da keser; dilimler bellek içinde ARDIŞIK durur,
- * böylece dış okuyucu (screenshot/GIF) tek parça görür.
- * Dilim: satır = y >> 2 (0..9), piksel = (y & 3) * 64 + x. */
-char screen0[256];
-char screen1[256];
-char screen2[256];
-char screen3[256];
-char screen4[256];
-char screen5[256];
-char screen6[256];
-char screen7[256];
-char screen8[256];
-char screen9[256];
+#define W 320
+#define H 200
 
 char map[256] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -46,8 +34,10 @@ char map[256] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-char sintab[64] = {0,1,2,2,3,4,4,5,6,6,7,7,7,8,8,8,8,8,8,8,7,7,7,6,6,5,4,4,3,2,2,1,0,255,254,254,253,252,252,251,250,250,249,249,249,248,248,248,248,248,248,248,249,249,249,250,250,251,252,252,253,254,254,255};
-char costab[64] = {8,8,8,8,7,7,7,6,6,5,4,4,3,2,2,1,0,255,254,254,253,252,252,251,250,250,249,249,249,248,248,248,248,248,248,248,249,249,249,250,250,251,252,252,253,254,254,255,0,1,2,2,3,4,4,5,6,6,7,7,7,8,8,8};
+/* 128 girişlik sin/kos dalga tabloları — her bir giriş 2.8125°; negatif
+ * değerler ikiye-tümleyen (0xF8 = -8).  dx = 8*sin(ağ), dy = 8*cos(ağ). */
+char sintab[128] = {0,0,1,1,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6,6,7,7,7,7,7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,7,7,7,7,7,6,6,6,6,5,5,5,4,4,4,3,3,3,2,2,2,1,1,0,0,0,255,255,254,254,254,253,253,253,252,252,252,251,251,251,250,250,250,250,249,249,249,249,249,248,248,248,248,248,248,248,248,248,248,248,248,248,248,248,249,249,249,249,249,250,250,250,250,251,251,251,252,252,252,253,253,253,254,254,254,255,255,0};
+char costab[128] = {8,8,8,8,8,8,8,8,7,7,7,7,7,6,6,6,6,5,5,5,4,4,4,3,3,3,2,2,2,1,1,0,0,0,255,255,254,254,254,253,253,253,252,252,252,251,251,251,250,250,250,250,249,249,249,249,249,248,248,248,248,248,248,248,248,248,248,248,248,248,248,248,249,249,249,249,249,250,250,250,250,251,251,251,252,252,252,253,253,253,254,254,254,255,255,0,0,0,1,1,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6,6,7,7,7,7,7,8,8,8,8,8,8,8};
 
 char px;
 char py;
@@ -55,9 +45,12 @@ char pa;
 
 void frame()
 {
+    int a;
     int x;
     int y;
-    for (x = 0; x < W; x = x + 1)
+    wrport(0x90, 0);   /* video cursor low  = 0 */
+    wrport(0x91, 0);   /* video cursor high = 0 */
+    for (a = 0; a < 64; a = a + 1)
     {
         int ang;
         int rx;
@@ -66,14 +59,14 @@ void frame()
         int dy;
         int d;
         int h;
-        int top;
-        int bottom;
         int hit;
-        int sl;
-        int pix;
         int tex;
         int sh;
-        ang = (pa + (x >> 1) - 16 + 64) & 63;
+        int top;
+        int bottom;
+        int w;
+        int fl;
+        ang = (pa + a + 96) & 127;      /* pa-32 .. pa+31 = 180° FOV */
         dx = sintab[ang];
         dy = costab[ang];
         rx = px + 8;
@@ -88,55 +81,31 @@ void frame()
             d = d + 1;
             if (map[((ry >> 4) * 16) + (rx >> 4)] != 0)
             {
-                h = 40 / d;
+                h = 200 / d;
                 if (h > H) { h = H; }
                 if (h < 1) { h = 1; }
                 hit = 1;
-                tex = ((ry >> 4) + (rx >> 4)) & 7;
-                if (d < 4) { sh = 5; }
-                if (d >= 4 && d < 7) { sh = 4; }
-                if (d >= 7 && d < 10) { sh = 3; }
-                if (d >= 10 && d < 13) { sh = 2; }
-                if (d >= 13 && d < 16) { sh = 1; }
-                if (d >= 16) { sh = 0; }
+                tex = ((ry >> 4) * 5 + (rx >> 4) * 3) & 7;
+                sh = 7;
+                if (d >= 3) { sh = 6; }
+                if (d >= 5) { sh = 5; }
+                if (d >= 7) { sh = 4; }
+                if (d >= 10) { sh = 3; }
+                if (d >= 14) { sh = 2; }
+                if (d >= 19) { sh = 1; }
+                if (d >= 24) { sh = 0; }
             }
         }
-        top = (40 - h) / 2;
+        top = (H - h) / 2;
         bottom = top + h;
-        for (y = 0; y < H; y = y + 1)
+        w = 48 + tex * 8 + sh;          /* 48..111: 64 duvar tonu */
+        fl = 46;                        /* '.' yakın zemin */
+        if (d > 12) { fl = 126; }       /* '~' uzak zemin */
+        for (x = 0; x < 5; x = x + 1)   /* 64 ışın x 5 = 320 kolon */
         {
-            char sprite;
-            sprite = ' ';
-            if (y < top) { sprite = ' '; }
-            if (top <= y && y < bottom)
-            {
-                if (hit == 1)
-                {
-                    /* 'A' + 8 doku * 6 gölge -> 48 duvar tonu */
-                    sprite = 'A' + tex * 6 + sh;
-                }
-                else
-                {
-                    sprite = '-';
-                }
-            }
-            if (y >= bottom)
-            {
-                if (d < 10) { sprite = '.'; }
-                else { sprite = '~'; }
-            }
-            sl = y >> 2;               /* 0..9: hangi dilim (4 satır x 64) */
-            pix = (y & 3) * W + x;     /* dilim içi 0..255 */
-            if (sl == 0) { screen0[pix] = sprite; }
-            if (sl == 1) { screen1[pix] = sprite; }
-            if (sl == 2) { screen2[pix] = sprite; }
-            if (sl == 3) { screen3[pix] = sprite; }
-            if (sl == 4) { screen4[pix] = sprite; }
-            if (sl == 5) { screen5[pix] = sprite; }
-            if (sl == 6) { screen6[pix] = sprite; }
-            if (sl == 7) { screen7[pix] = sprite; }
-            if (sl == 8) { screen8[pix] = sprite; }
-            if (sl == 9) { screen9[pix] = sprite; }
+            for (y = 0; y < top; y = y + 1) { wrport(0x92, 32); }
+            for (y = top; y < bottom; y = y + 1) { wrport(0x92, w); }
+            for (y = bottom; y < H; y = y + 1) { wrport(0x92, fl); }
         }
     }
 }
@@ -145,15 +114,15 @@ void main()
 {
     px = 8 * 16 + 8;
     py = 8 * 16 + 8;
-    pa = 16;
+    pa = 32;                             /* Doom açı 0° = Doğu */
     while (1)
     {
         int k;
         int nx;
         int ny;
         k = rdport(0);
-        if (k == 'a' || k == 'A') { pa = (pa + 2) & 63; }
-        if (k == 'd' || k == 'D') { pa = (pa - 2) & 63; }
+        if (k == 'a' || k == 'A') { pa = (pa + 4) & 127; }
+        if (k == 'd' || k == 'D') { pa = (pa - 4) & 127; }
         if (k == 'w' || k == 'W')
         {
             nx = px + sintab[pa];
