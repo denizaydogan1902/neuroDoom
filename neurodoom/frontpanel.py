@@ -26,10 +26,10 @@ from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
 
 BASE = 0x1000
-W, H = 16, 16
+W, H = 32, 32
 # uzaklığa göre piksel paleti (screen byte'ları bunlardır)
-GRAY = {"#": "\x1b[37;40m#", "%": "\x1b[33;40m%", "+": "\x1b[33;40m+",
-        ".": "\x1b[30;40m.", " ": "\x1b[30;40m "}
+GRAY = {"@": "\x1b[37;47m@", "#": "\x1b[37;40m#", "%": "\x1b[33;40m%",
+        "+": "\x1b[33;40m+", ".": "\x1b[30;40m.", " ": "\x1b[30;40m "}
 
 
 def build_environment() -> tuple[NeuroCPU, Memory, dict, dict, GateRegistry]:
@@ -48,7 +48,7 @@ def build_environment() -> tuple[NeuroCPU, Memory, dict, dict, GateRegistry]:
 
 
 def draw_frame(mem: Memory, varmap: dict, port_log: list[int]) -> None:
-    scr = varmap["screen"]
+    scr = varmap["screen0"]
     out = ["\x1b[H"]
     for y in range(H):
         row = ""
@@ -56,8 +56,8 @@ def draw_frame(mem: Memory, varmap: dict, port_log: list[int]) -> None:
             ch = chr(int(mem.ram[scr + y * W + x]))
             row += GRAY.get(ch, GRAY["."])
         out.append(row + "\x1b[0m")
-    px = int(mem.ram[varmap["px"]]) / 32.0
-    py = int(mem.ram[varmap["py"]]) / 32.0
+    px = int(mem.ram[varmap["px"]]) / 16.0
+    py = int(mem.ram[varmap["py"]]) / 16.0
     pa = int(mem.ram[varmap["pa"]])
     firings = port_log[-1] if port_log else 0
     out.append(f"\x1b[0;90m pos=({px:.1f},{py:.1f}) yaw={pa}° "

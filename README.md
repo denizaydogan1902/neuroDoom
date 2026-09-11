@@ -21,10 +21,10 @@ Software is not simulated on the brain; the machine code is executed by
 
 | | Original Doom (1993) | NeuroDoom |
 |---|---|---|
-| **Display** | 320×200 px, 256 colors | 16×16 px, 5 shade levels |
+| **Display** | 320×200 px, 256 colors | 32×32 px, 6 shade levels |
 | **CPU** | Intel 486 (millions of transistors) | 812 NAND gates (from fly brain) |
 | **Gate count** | ~1.2M transistors | 812 |
-| **Speed** | 35 fps | ~2 fps |
+| **Speed** | 35 fps | ~1 fps |
 | **Engine** | id Tech 1 (hand-written Assembly) | DDA raycasting (C → our compiler) |
 
 Original Doom:
@@ -45,27 +45,37 @@ brain. Same room, different machine.
 The map below shows exactly why the frames look alike: Doom's E1M1 wall
 layout (left) is the very data our engine runs. `doom2neuro.py` parsed the
 original WAD's VERTEXES/LINEDEFS/THINGS and rasterized the opening room into
-the 8×8 grid (right, `1` = wall). Both views converge on the same Hangar.
+the 16×16 grid (right, `1` = wall). Both views converge on the same Hangar.
 
 | Original Doom automap (E1M1) | NeuroDoom grid from that map |
 |---|---|
 | ![Original E1M1 map](docs/screenshots/e1m1_map.png) | See below |
 
 ```
-E1M1 grid (opening room window):
-00000000
-01111111
-01000000
-11000000
-11000000
-11000000
-01111111
-00000000
+E1M1 grid (256×256 world-unit window around the spawn):
+................
+................
+................
+..##############
+..#.............
+..#.............
+###.............
+#.#.............
+#.#.............
+#.#.............
+###.............
+..#.............
+..#.............
+..##############
+................
+................
 ```
+(The player spawns at the 8th row/col, on the cell marked by the `#.#`
+column — the opening room of the Hangar. `1` = wall, `0` = open space.)
 
 ### Running on the fly brain — animated
 
-Eleven frames, rendered by the 812-gate NeuroCPU-8 from actual machine
+Fourteen frames, rendered by the 812-gate NeuroCPU-8 from actual machine
 instructions, stitched into a GIF: walk east down the Hangar, turn around,
 walk back. No simulation — every pixel passed through real NAND gates.
 
@@ -81,7 +91,7 @@ E1M1 "Hangar" map data from the original shareware DOOM1.WAD:
 
 These are not mockups: each PNG comes from `python -m neurodoom.screenshot`,
 which runs the binary on the 812-gate NeuroCPU-8 and reads the resulting
-16×16 framebuffer from RAM.
+32×32 framebuffer from RAM.
 
 ## Real Doom data, real gates
 
@@ -94,9 +104,9 @@ DOOM1.WAD (E1M1 "Hangar")
       ▼
     wall lines & player spawn
       ▼
-    8×8 grid rasterization (line intersection with a 256-unit window)
+    16×16 grid rasterization (line intersection with a 256-unit window)
       ▼
-    doom.c map[] — compiled to NÖRO-8 assembly
+    doom.c map[256] — compiled to NÖRO-8 assembly
 ```
 
 The player starts exactly where Doom's E1M1 `THINGS` places the marine
@@ -141,21 +151,21 @@ Our own C compiler (`neurodoom/cc/`) supports a minimal C subset:
 The Doom engine (`neurodoom/apps/doom.c`) is written entirely in this
 language:
 
-- 16×16 pixel raycasting (DDA algorithm)
-- 8×8 cell map (from E1M1)
+- 32×32 pixel raycasting (DDA algorithm)
+- 16×16 cell map (from E1M1, 256 bytes)
 - Input: port 0 (keyboard)
 - Output: port 2 writes (frame sync)
 
 ### 4. Pipeline
 
 ```
-doom.c ──[compiler]──→ NÖRO-8 machine code (2.1 KB)
+doom.c ──[compiler]──→ NÖRO-8 machine code (3.4 KB)
                             │
                             ▼
                   812-gate circuit (brains)
                             │
                             ▼
-                  16×16 pixel display
+                  32×32 pixel display
 ```
 
 ## Running
@@ -248,9 +258,10 @@ neurodoom/
 - **Memory:** 64 KB byte-addressable RAM, ported I/O
 - **Address spaces:** program starts at 0x1000, globals at 0x0200
 - **Assembly:** two-pass, labels resolved to absolute addresses
-- **Shading:** wall distance → `#` (near), `%`, `+`, `.`, `<space>` (far)
-- **Map:** 8×8 cells, each cell 32 world-units wide
-- **Per frame:** ~32,000 machine instructions, ~460,000 gate activations
+- **Shading:** wall distance → `@` (near), `#`, `%`, `+`, `.` (far); floor fades
+  after the wall bottom
+- **Map:** 16×16 cells, each cell 16 world-units wide
+- **Per frame:** ~176,000 machine instructions, ~2.0M gate activations
 
 ## Numbers
 
@@ -259,10 +270,10 @@ neurodoom/
 | Neurons | 21,739 |
 | Synapses | 3,550,403 |
 | NAND gates | 812 |
-| Machine code | 2,129 bytes |
+| Machine code | 3,400 bytes |
 | Tests | 21/21 |
-| Frame rate | ~2 fps |
-| Gate activations/frame | ~460,000 |
+| Frame rate | ~1 fps |
+| Gate activations/frame | ~2.0M |
 
 ## Credits
 

@@ -134,14 +134,18 @@ def main() -> None:
     ld = parse_linedefs(map_lump(lumps, order, "E1M1", "LINEDEFS"))
     things = parse_things(map_lump(lumps, order, "E1M1", "THINGS"))
 
+    SIZE = 16
+    CELL = 16
+
     # oyuncu 1. açık oda çevresini kaplayan pencere
     player = next((t for t in things if t[3] == 1), things[0])
     px, py = player[0], player[1]
 
-    grid, x0, y0, scale, w, h = build_grid(verts, ld, px=px, py=py)
-    pcell0 = (px - x0) // 32
-    pcell1 = (py - y0) // 32
-    if 0 <= pcell0 < 8 and 0 <= pcell1 < 8:
+    grid, x0, y0, scale, w, h = build_grid(verts, ld, px=px, py=py,
+                                           size=SIZE, cell=CELL)
+    pcell0 = (px - x0) // CELL
+    pcell1 = (py - y0) // CELL
+    if 0 <= pcell0 < SIZE and 0 <= pcell1 < SIZE:
         grid[pcell1, pcell0] = 0   # oyuncu hücresi boş
 
     print(f"E1M1 Hangar girişi: pencere x∈[{x0},{x0 + w}] y∈[{y0},{y0 + h}]")

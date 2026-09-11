@@ -22,13 +22,15 @@ from .cpu.memory import Memory
 from .cpu.cpu import NeuroCPU
 
 BASE = 0x1000
-SCALE = 24                 # her pikselin kenar uzunluğu
+SCALE = 18                 # her pikselin kenar uzunluğu (32x18=576)
+W = H = 32
 PALET = {
     ' ': (12, 12, 14),
     '.': (58, 60, 66),
     '+': (116, 108, 96),
     '%': (178, 162, 122),
     '#': (238, 222, 182),
+    '@': (255, 244, 214),
 }
 
 
@@ -61,26 +63,26 @@ def main() -> None:
                     mem.ram[vm['px']] = preset[0] & 0xFF
                     mem.ram[vm['py']] = preset[1] & 0xFF
                     mem.ram[vm['pa']] = preset[2] & 0xFF
-        s = vm['screen']
-        return [[chr(int(mem.ram[s + y * 16 + x])) for x in range(16)]
-                for y in range(16)]
+        s = vm['screen0']
+        return [[chr(int(mem.ram[s + y * 32 + x])) for x in range(32)]
+                for y in range(32)]
 
-    sx = 4 * 32 + 16
-    poses = [(sx + dx * 6, 4 * 32 + 16, 16) for dx in range(0, 7)]      # doğuya yürü
-    poses += [(sx + 6 * 6, 4 * 32 + 16, 24),
-              (sx + 6 * 6, 4 * 32 + 16, 32),
-              (sx + 6 * 6, 4 * 32 + 16, 40)]                             # dön
-    poses += [(sx + 7 * 6, 4 * 32 + 16, 48),
-              (sx + 5 * 6, 4 * 32 + 16, 48)]                             # geri gel
+    sx = 8 * 16 + 8
+    poses = [(sx + dx * 4, 8 * 16 + 8, 16) for dx in range(0, 9)]      # doğuya yürü
+    poses += [(sx + 8 * 4, 8 * 16 + 8, 24),
+              (sx + 8 * 4, 8 * 16 + 8, 32),
+              (sx + 8 * 4, 8 * 16 + 8, 40)]                             # dön
+    poses += [(sx + 9 * 4, 8 * 16 + 8, 48),
+              (sx + 7 * 4, 8 * 16 + 8, 48)]                             # geri gel
 
     frames: list[Image.Image] = []
-    size = 16 * SCALE
+    size = 32 * SCALE
     for p in poses:
         chars = render(p)
         img = Image.new('RGB', (size, size))
         px = img.load()
-        for y in range(16):
-            for x in range(16):
+        for y in range(32):
+            for x in range(32):
                 c = PALET.get(chars[y][x], PALET[' '])
                 for yy in range(SCALE):
                     for xx in range(SCALE):
