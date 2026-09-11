@@ -31,6 +31,46 @@ Original Doom:
 
 ![Original Doom (1993)](docs/doom-cover.jpg)
 
+### Side-by-side
+
+The classic PC hides in the left column; NeuroDoom renders the same scene —
+the E1M1 Hangar entrance — using only 812 gates harvested from a fruit fly's
+brain. Same room, different machine.
+
+| Original Doom (E1M1, running on a 486) | NeuroDoom (E1M1, running on 812 fly-brain NAND gates) |
+|---|---|
+| ![Original E1M1 start](docs/screenshots/e1m1_start.png) | ![NeuroDoom E1M1 start](docs/screenshots/start.png) |
+| ![Original E1M1 corridor](docs/screenshots/e1m1_sentry.png) | ![NeuroDoom E1M1 corridor](docs/screenshots/advanced.png) |
+
+The map below shows exactly why the frames look alike: Doom's E1M1 wall
+layout (left) is the very data our engine runs. `doom2neuro.py` parsed the
+original WAD's VERTEXES/LINEDEFS/THINGS and rasterized the opening room into
+the 8×8 grid (right, `1` = wall). Both views converge on the same Hangar.
+
+| Original Doom automap (E1M1) | NeuroDoom grid from that map |
+|---|---|
+| ![Original E1M1 map](docs/screenshots/e1m1_map.png) | See below |
+
+```
+E1M1 grid (opening room window):
+00000000
+01111111
+01000000
+11000000
+11000000
+11000000
+01111111
+00000000
+```
+
+### Running on the fly brain — animated
+
+Eleven frames, rendered by the 812-gate NeuroCPU-8 from actual machine
+instructions, stitched into a GIF: walk east down the Hangar, turn around,
+walk back. No simulation — every pixel passed through real NAND gates.
+
+![E1M1 Hangar — walking and turning, rendered by the fly-brain CPU](docs/screenshots/e1m1_run.gif)
+
 NeuroDoom — real frames rendered by real fly-brain gates, using the **actual**
 E1M1 "Hangar" map data from the original shareware DOOM1.WAD:
 
@@ -170,6 +210,13 @@ python -m neurodoom.screenshot
 # writes 4 PNGs under docs/screenshots/
 ```
 
+### Rebuild the walk-cycle GIF
+
+```sh
+python -m neurodoom.make_gif
+# renders frames on the fly-brain CPU and stitches docs/screenshots/e1m1_run.gif
+```
+
 ## Project layout
 
 ```
@@ -222,6 +269,9 @@ neurodoom/
 - Connectome data: traced hemibrain of *Drosophila melanogaster*
   (synaptic connectivity used to derive the gate netlist)
 - Original Doom cover (`docs/doom-cover.jpg`) via Wikipedia
+- Original E1M1 screenshots and automap (`docs/screenshots/e1m1_*.png`) via
+  The Doom Wiki (doomwiki.org) — Original Doom © id Software,
+  used here for identification and comparison only
 
 ## License
 
