@@ -1,84 +1,167 @@
 # NeuroDoom
 
-Doom running on an 8-bit CPU built from the NAND gates extracted from the
-neural network of a fruit fly.
+Orijinal Doom (1993) gibi birinci şahıs nişancı oyunu — ama bu sefer CPU, bir meyve sineğinin beyin sinir ağından çıkarılmış 812 NAND kapısından kurulu.
 
-A biological brain does not play this game — **the brain's gates *are* the
-hardware, and Doom is the software running on it.**
+**Beyin oynamıyor. Beyin *oynatıyor.***
 
-Every frame goes through real neurons traced from *Drosophila melanogaster*:
-**812 NAND gates** reshape a raycasted, texture-shaded 16×16 viewport at
-roughly half a million gate activations per frame.
+## Bu proje ne?
 
-> Cell shading: the closer a wall, the brighter the glyph.
-> `#` near, `%` mid, `+`/`.` far, `<space>` void.
+1993'te id Software'in çıkardığı Doom, kişisel bilgisayar tarihinin en ikonik oyunlarından biri. Biz bu projede Doom'un 3D görünümünü (raycasting) kendi C derleyicimizle yazdık ve bu kodu **gerçek bir sinir ağı üzerine kurulu bir işlemci** üzerinde çalıştırdık.
 
-![Start — player at (3.5, 3.5) facing east](docs/screenshots/start.png)
-![Advanced — player moved forward to (4.5, 3.5)](docs/screenshots/advanced.png)
-![Turned — player rotated 90° yaw](docs/screenshots/turned.png)
-![Retreat — player backed to (2.5, 3.5)](docs/screenshots/retreat.png)
+İşlemcinin tüm kapıları — ALU, register dosyası, bellek denetleyicisi — Drosophila melanogaster (meyve sineği) beyninden izlenmiş sinaptik bağlantılardan elde edildi. yani **yazılım gerçek bir biyolojik sinir ağı üzerinde çalışıyor.**
 
-> Shading model: each screen column casts one ray; distance to the wall
-> selects the glyph. Movement and rotation update `px,py,pa` by
-> `sintab`/`costab`, collision is a single map lookup. All of this is C,
-> compiled to machine code that only the neurons above execute.
+## Orijinal Doom vs. Bizim Doom
 
-## How it works
+| | Orijinal Doom (1993) | NeuroDoom |
+|---|---|---|
+| **Görüntü** | 320×200 piksel, 256 renk | 16×16 piksel, 5 gölge seviyesi |
+| **CPU** | Intel 486 (milyonlarca transistör) | 812 NAND kapısı (meyve sineği beyninden) |
+| **Kapı sayısı** | ~1.200.000 transistör | 812 |
+| **Hız** | 35 fps | ~0.2 fps |
+| **Motor** | id Tech 1 (el yazısı Assembly) | DDA raycasting (C → kendi derleyicimiz) |
+
+Orijinal Doom:
+
+![Orijinal Doom (1993)](docs/doom-cover.jpg)
+
+Bizim Doom — **gerçek beyin kapılarından geçen ilk kareler:**
+
+![Başlangıç — oyuncu (3.5, 3.5) konumunda doğuya bakıyor](docs/screenshots/start.png)
+![İleri yürüdü — (4.5, 3.5)](docs/screenshots/advanced.png)
+![Döndü — 90° sağa döndü](docs/screenshots/turned.png)
+![Geri çekildi — (2.5, 3.5)](docs/screenshots/retreat.png)
+
+## Nasıl çalışıyor?
+
+### 1. Beyinden kapıya
+
+Drosophila melanogaster beyninin bağlantı haritası (connectome) CSV dosyalarında kayıtlı:
+- **21.739 nöron**, **3.550.403 sinaps**
+
+Her nöronun iki güçlü presinaptik girdisi varsa ve ikisi de aktifse → nöron ateşlenir → bu bir **NAND kapısı** davranışıdır. `neurodoom/synth/` modülü bu dönüşümü yapar:
 
 ```
-Doom (C)                  neurodoom/apps/doom.c — 16×16 raycast engine
-  │  compiled by our own C compiler (statics, loops, calls, #define)
-  ▼
-NÖRO-8 machine code        2.1KB: DDA raycaster + multiply/divide
-  │  assembler → 16-bit address space, 8-bit data
-  ▼
-NAND netlist → ALU         a full register machine from first principles:
-  │   CALL/RET stack, conditional jumps, SHL/SHR/MUL, port-mapped I/O
-  ▼
-Real neural hardware       Drosophila hemibrain: 21,739 neurons,
-                           3,550,403 synapses → 812 NAND gates
+nöron + sinaps ağırlıkları → eşik taraması → NAND hücresi
+                                            → 812 kapılı devre
 ```
 
-The CPU, the ALU, the register file and the memory bus **do not exist apart
-from the brain.** `neurodoom/synth/` turns the traced connectome into a
-boolean circuit: a neuron with two strong presynaptic inputs fires only when
-*both* are active — a NAND. The whole thing is evaluated gate by gate for
-every instruction cycle.
+### 2. Kapıdan CPU'ya
 
-## Play it
+812 NAND kapısı, 8-bitlik bir RISC işlemciyi (NÖRO-8) oluşturur:
+- 16 register (R0–R15)
+- 16-bit program sayacı
+- CALL/RET yığın çağırmaları
+- Koşullu dallar (JZ/JNZ/JC/JNC)
+- Port tabanlı G/Ç (klavye, ekran, senkron)
+- Carpan/bölme (yazılım destekli)
+
+### 3. CPU'dan Doom'a
+
+Kendi C derleyicimiz (`neurodoom/cc/`) minimal bir C alt kümesi destekler:
+- Globaller ve diziler
+- Fonksiyonlar (işaretçisiz)
+- `#define` makroları
+- Döngüler ve koşullar
+- Aritmetik (toplama, çıkarma, çarpma, bölme)
+
+Doom motoru (`neurodoom/apps/doom.c`) tamamen bu dille yazılmış:
+- 16×16 piksel raycasting (DDA algoritması)
+- 8×8 hücrelik harita
+- Tuş girişi: port 0'dan okuma
+- Çıkış: port 2'ye yazarak senkron
+
+### 4. Çalışma akışı
+
+```
+doom.c  ──[derleyici]──→  NÖRO-8 makine kodu (2.1KB)
+                              │
+                              ▼
+                    812 NAND kapısı (beyin)
+                              │
+                              ▼
+                    16×16 piksel ekran
+```
+
+## Çalıştırma
+
+### Gereksinimler
 
 ```sh
 python -m venv .venv && source .venv/bin/activate
 pip install numpy scipy pytest
-
-pytest -q                       # 21 tests — CPU, compiler, brain scan
-
-python -m neurodoom.frontpanel  # boot the fly brain and play
 ```
 
-| Key     | Action            |
-|---------|-------------------|
-| `W`     | move forward      |
-| `S`     | move backward     |
-| `A` / `D` | turn left / right |
-| `ESC` / `Ctrl-C` | quit       |
+### Testler
 
-## Pipeline details
+```sh
+pytest -q
+# 21 test: CPU, derleyici, beyin taraması, ALU
+```
 
-- `neurodoom/cc/` — the C subset compiler (globals, arrays, functions without
-  pointers, `#define`, loops, conditionals, arithmetic) feeding our own
-  two-pass assembler. No hand-written assembly anywhere.
-- `neurodoom/cpu/` — `NeuroCPU` hosting a real `RegisterFile` built from the
-  same brain; 3.5M synapses scanned once, then run as NAND gates.
-- `neurodoom/screenshot.py` — regenerates the PNG captures above from actual
-  gate-level execution.
+### Doom'u çalıştır
 
-## Data
+```sh
+python -m neurodoom.frontpanel
+```
 
-- `data/traced-total-connections.csv` — 3,550,403 traced synapses
-- `data/traced-neurons.csv` — 21,739 traced neurons
+Klavye kontrolleri:
+- **W** — ileri git
+- **S** — geri gel
+- **A** / **D** — sola / sağa dön
+- **ESC** / **Ctrl-C** — çık
 
-Everything is self-contained: the game logic lives in
-`neurodoom/apps/doom.c`, the silicon in `neurodoom/synth/`, the machine in
-`neurodoom/cpu/`, the toolchain in `neurodoom/cc/`. Nothing anywhere "plays"
-the game for the CPU — the CPU itself is neural.
+### Ekran görüntüsü üret
+
+```sh
+python -m neurodoom.screenshot
+# docs/screenshots/ altına 4 PNG kaydeder
+```
+
+## Proje yapısı
+
+```
+neurodoom/
+├── apps/
+│   └── doom.c              # Doom raycast motoru (C)
+├── cc/
+│   ├── compiler.py          # C derleyicisi
+│   ├── lexer.py             # Token ayrıştırıcı (#define destekli)
+│   └── parser.py            # C söz dizimi ayrıştırıcı
+├── cpu/
+│   ├── cpu.py               # NeuroCPU (NAND kapısı düzeyinde)
+│   ├── memory.py            # Bellek + port G/Ç
+│   └── regfile.py           # Register dosyası (beyinから)
+├── synth/
+│   ├── brain.py             # Hemibrain bağlantı haritası yükleme
+│   ├── gate_registry.py     # NAND hücresi tarama
+│   └── alu.py               # 8-bit ALU (kapı kapı)
+├── assembler.py             # Two-pass assembler
+├── datasheet.py             # ISA tanımı (komut kodları)
+├── frontpanel.py            # Terminal oyun ön paneli
+└── screenshot.py            # PNG ekran görüntüsü üretici
+```
+
+## Teknik detaylar
+
+- **Bellek:** 256 byte RAM (0x00FF'e kadar), port tabanlı G/Ç
+- **Adres alanları:** program 0x1000'de başlar, globaller 0x0200'de
+- **Derleme:** iki aşamalı assembler, label'lar mutlak adres
+- **Gölgelendirme:** duvara uzaklık → `#` (yakın), `%`, `+`, `.`, `<boşluk>` (uzak)
+- **Harita:** 8×8 hücre, her hücre 32 piksel genişliğinde
+- **Dans:** her kare ~32.000 makine komutu, ~460.000 kapı aktivasyonu
+
+## Sayılarla
+
+| Metrik | Değer |
+|---|---|
+| Nöron | 21.739 |
+| Sinaps | 3.550.403 |
+| NAND kapısı | 812 |
+| Makine kodu | 2.129 byte |
+| Testler | 21/21 |
+| Kare hızı | ~2 fps |
+| Kapı aktivasyonu/kare | ~460.000 |
+
+## Lisans
+
+Bu proje eğitim amaçlıdır. Doom, id Software'in tescilli markasıdır. Orijinal Doom görseli (docs/doom-cover.jpg) Wikipedia üzerinden alınmıştır.
