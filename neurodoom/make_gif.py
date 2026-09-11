@@ -55,13 +55,13 @@ def main() -> None:
 
     sx = 8 * 16 + 8                       # 136 — oyuncu hücresi merkezi
     sy = 8 * 16 + 8
-    poses = [(sx + dx * 4, sy, 32) for dx in range(0, 8)]               # doğuya yürü
-    poses += [(sx + 7 * 4, sy, 48),
-              (sx + 7 * 4, sy, 64),
-              (sx + 7 * 4, sy, 80)]                                     # kuzeye dön
-    poses += [(sx + 5 * 4, sy, 64),
-              (sx + 3 * 4, sy, 64),
-              (sx + 1 * 4, sy, 48)]                                     # duvara yaklaş
+    poses = [(sx + dx * 4, sy, 64) for dx in range(0, 8)]               # doğuya yürü
+    poses += [(sx + 7 * 4, sy, 96),
+              (sx + 7 * 4, sy, 112),
+              (sx + 7 * 4, sy, 128)]                                     # kuzeye dön
+    poses += [(sx + 5 * 4, sy, 128),
+              (sx + 3 * 4, sy, 128),
+              (sx + 1 * 4, sy, 112)]                                     # duvara yaklaş
 
     frames: list[Image.Image] = []
     size = 320 * SCALE, 200 * SCALE

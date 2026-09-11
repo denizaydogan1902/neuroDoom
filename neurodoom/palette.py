@@ -1,8 +1,8 @@
 """Doom.c framebuffer piksellerini renge çeviren ortak palet.
 
 doom.c her pencereyi byte olarak basar (port 0x92, kolon-major video[]):
-    32  = tavan / boşluk (koyu)
-    46  = yakın zemin  ('~' uzak zemin = 126)
+    0..15   = zemin mesafe tonları (yakın parlak -> uzak koyu)
+    16..23  = gökyüzü gradyanı (17 üst koyu, 20 pus bandı UFC)
     48..111 = 8 doku rengi x 8 uzaklık gölgesi = 64 duvar tonu
 
 PNG üretiminde (screenshot/GIF) RGB, terminalde (frontpanel) 256-renk ANSI
@@ -12,35 +12,49 @@ from __future__ import annotations
 
 import numpy as np
 
-# Her doku: (uzak, koyu) -> (yakın, parlak) uc renkleri.
+# Her doku: (uzak, koyu) -> (yakın, parlak) uç renkleri. Doom E1M1'in
+# "hangar" dokusuna yakın, doygunluğu düşük teknoloji-metal tonları.
 _TEX = [
-    ((46, 48, 52), (150, 154, 164)),     # 0  beton-gri
-    ((40, 62, 88), (120, 178, 224)),     # 1  çelik mavi
-    ((92, 66, 30), (196, 158, 100)),     # 2  pas / kahve
-    ((54, 84, 52), (150, 208, 128)),     # 3  askeri yeşil
-    ((92, 40, 34), (206, 122, 96)),      # 4  kırmızı tuğla / metal
-    ((56, 84, 88), (130, 208, 200)),     # 5  turkuaz makine
-    ((84, 54, 104), (190, 140, 220)),    # 6  mor lamba/panel
-    ((104, 92, 36), (232, 210, 120)),    # 7  sarı uyarı şeridi
+    ((56, 62, 56), (168, 172, 158)),     # 0 STARTAN-gri; gri-yeşil beton
+    ((58, 66, 80), (148, 164, 184)),     # 1 çelik mavi panel
+    ((78, 60, 42), (186, 152, 116)),     # 2 paslı boru / kahverengi
+    ((62, 84, 62), (150, 182, 140)),     # 3 askeri yeşil (STARTAN3)
+    ((84, 50, 44), (180, 118, 100)),     # 4 tuğla-kırmızı kompresör
+    ((50, 78, 82), (132, 188, 186)),     # 5 teal/Gray 7 makine
+    ((74, 70, 50), (186, 176, 138)),     # 6 kamuflaj zeytin
+    ((46, 48, 52), (138, 142, 146)),     # 7 (farklı gri ton)
 ]
 
-WALL_BASE = 48                          # 48 + tex*8 + gölge (0..63)
-FLOOR_NEAR = (132, 130, 124)
-FLOOR_FAR = (50, 50, 55)
+WALL_BASE = 48
+
+# Gökyüzü: 16 en üstte koyu ... 20 ufka doğru pus bandı artar.
+_SKY = [
+    (38, 48, 64),    # 16 derin
+    (48, 62, 82),    # 17
+    (58, 74, 96),    # 18
+    (72, 90, 112),   # 19 pus (ufuk alt bandı)
+    (86, 104, 126),  # 20 en aydınlık ufuk
+]
+
+# Zemin: 0 uzak-koyu ... 15 yakın-parlak
+_FLOOR = [(20 + int(i * 6.5), 20 + int(i * 6.5), 24 + int(i * 7.0))
+          for i in range(16)]
+
 VOID = (10, 10, 12)
 
 
 def build_palette() -> dict[int, tuple[int, int, int]]:
     pal: dict[int, tuple[int, int, int]] = {}
+    for i, col in enumerate(_FLOOR):
+        pal[i] = col
+    for i, col in enumerate(_SKY):
+        pal[16 + i] = col
     for t in range(8):
         dark, light = _TEX[t]
         for s in range(8):               # s=7 yakın, s=0 uzak
-            f = 0.35 + s / 7 * 0.75      # uzak koyu -> yakın parlak
-            col = tuple(int(dark[i] + (light[i] - dark[i]) * f) for i in range(3))
-            pal[WALL_BASE + t * 8 + s] = col
-    pal[32] = VOID
-    pal[46] = FLOOR_NEAR
-    pal[126] = FLOOR_FAR
+            f = 0.35 + s / 7 * 0.75
+            pal[WALL_BASE + t * 8 + s] = tuple(
+                int(dark[i] + (light[i] - dark[i]) * f) for i in range(3))
     return pal
 
 

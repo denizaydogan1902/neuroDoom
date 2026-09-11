@@ -74,10 +74,10 @@ def capture() -> dict[str, np.ndarray]:
         return img, cpu.state.gate_firings
 
     out: dict[str, np.ndarray] = {}
-    out["start"] = frame(None)[0]                    # E1M1 spawn (8,8) 32=Doğu
-    out["advanced"] = frame((136 + 16, 136, 32))[0]  # doğuya ilerlemiş
-    out["turned"] = frame((136, 136, 64))[0]         # kuzey duvara dönmüş
-    out["retreat"] = frame((136 - 16, 136, 32))[0]   # doğuya geri
+    out["start"] = frame(None)[0]                    # E1M1 spawn (8,8) 64=Doğu
+    out["advanced"] = frame((136 + 16, 136, 64))[0]  # doğuya ilerlemiş
+    out["turned"] = frame((136, 136, 128))[0]        # kuzey duvara dönmüş
+    out["retreat"] = frame((136 - 16, 136, 64))[0]   # doğuya geri
     return out
 
 

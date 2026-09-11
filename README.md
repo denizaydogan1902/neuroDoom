@@ -264,10 +264,15 @@ neurodoom/
 - **Assembly:** two-pass, labels resolved to absolute addresses
 - **Video:** port-mapped 320×200 framebuffer (VID_L/VID_H/VID_D at 0x90/0x91/0x92);
   one `OUT` per pixel with auto-incrementing column-major cursor
-- **Shading:** wall distance → 8 texture hues, each 8 depth levels;
-  floor fades to dark, ceiling stays dark
+- **Shading:** wall distance → 8 texture hues, each 8 depth levels + 1 inner
+  half-tone dither, so walls look textured; floor fades to dark with a 16-unit
+  grid; sky gradients near the horizon
 - **Map:** 16×16 cells, each cell 16 world-units wide
-- **Per frame:** ~2.8M machine instructions, ~34M gate activations
+- **Raycast:** 64 rays × 5 px columns = 320 wide, 90° FOV, 256-entry
+  sin/cos tables (1.40625°/entry); perpendicular-distance perspective
+  (`h = 200/(d·cos)`); 8-bit ray overflow caught by sdir wrap detection so no
+  phantom walls wrap around the world
+- **Per frame:** ~2.79M machine instructions, ~31.5M gate activations
 
 ## Numbers
 
@@ -276,10 +281,10 @@ neurodoom/
 | Neurons | 21,739 |
 | Synapses | 3,550,403 |
 | NAND gates | 812 |
-| Machine code | 3,930 bytes |
+| Machine code | 5,779 bytes |
 | Tests | 21/21 |
 | Frame rate | ~0.17 fps (Python gate simulation) |
-| Gate activations/frame | ~34M |
+| Gate activations/frame | ~31.5M |
 
 ## Credits
 
